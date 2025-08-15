@@ -42,7 +42,18 @@ with col2:
 with col3:
     extra_file = st.file_uploader("Extra data file (FLT, DES, ATA, ATD)", type=["xlsx","xls","csv"], key="extra")
 
-use_sample = st.button("Load sample data")
+col_btn1, col_btn2 = st.columns([1, 1])
+with col_btn1:
+    use_sample = st.button("Load sample data")
+with col_btn2:
+    reset_data = st.button("Reset data")
+
+# Reset logic
+if reset_data:
+    dep_df = pd.DataFrame()
+    arr_df = pd.DataFrame()
+    extra_df = pd.DataFrame()
+    st.experimental_rerun()
 
 def find_col(df, target):
     target = target.strip().upper()
