@@ -149,10 +149,10 @@ if extra_df is not None and len(extra_df) > 0:
             extra_arr = ea[["Label","start","end","marker","type","time_str"]]
 
 # Colors
-COL_DEP = "#1f77b4"      # blue (base)
-COL_ARR = "#d62728"      # red (base)
-COL_DEP_EX = "#17becf"   # cyan for extra dep
-COL_ARR_EX = "#ff7f0e"   # orange for extra arr
+COL_ARR = "#1f77b4"      # blue (base)
+COL_DEP = "#d62728"      # red (base)
+COL_ARR_EX = "#17becf"   # cyan for extra dep
+COL_DEP_EX = "#ff7f0e"   # orange for extra arr
 
 # ---- Build intervals for overlaps (incl. extras) ----
 def _to_intervals(df):
