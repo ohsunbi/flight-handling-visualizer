@@ -48,12 +48,23 @@ with col_btn1:
 with col_btn2:
     reset_data = st.button("Reset data")
 
-# Reset logic
+# Reset logic (replace this block)
 if reset_data:
-    dep_df = pd.DataFrame()
-    arr_df = pd.DataFrame()
-    extra_df = pd.DataFrame()
-    st.experimental_rerun()
+    # clear file uploaders & any temp flags
+    for k in ("dep", "arr", "extra"):
+        st.session_state.pop(k, None)
+
+    # if you stored any dataframes/flags in session_state, clear them too (optional)
+    for k in ("dep_df", "arr_df", "extra_df", "use_sample"):
+        st.session_state.pop(k, None)
+
+    # rerun (new API)
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        # fallback for very old Streamlit
+        st.experimental_rerun()
+
 
 def find_col(df, target):
     target = target.strip().upper()
