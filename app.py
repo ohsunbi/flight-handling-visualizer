@@ -330,8 +330,12 @@ def count_overlaps(intervals, t):
     if len(intervals)==0: return 0
     return ((intervals["start"] <= t) & (intervals["end"] > t)).sum()
 
-dep_counts = [count_overlaps(dep_intervals, t) for t in time_range]
-arr_counts = [count_overlaps(arr_intervals, t) for t in time_range]
+# compute overlaps at the midpoint of each interval
+mid_times = [time_range[i] + (time_range[i+1] - time_range[i]) / 2
+             for i in range(len(time_range) - 1)]
+dep_counts = [count_overlaps(dep_intervals, t) for t in mid_times]
+arr_counts = [count_overlaps(arr_intervals, t) for t in mid_times]
+
 
 # ---- Timeline with inline overlap numbers (two rows) ----
 fig1, ax1 = plt.subplots(figsize=(12, 8))
@@ -404,28 +408,30 @@ ax1.set_title("Flight Handling Timeline")
 
 # Inline overlap numbers (two rows, top line = Departure (red), bottom line = Arrival (blue))
 trans = transforms.blended_transform_factory(ax1.transData, ax1.transAxes)
-max_d = max(dep_counts) if len(dep_counts)>0 else 1
-max_a = max(arr_counts) if len(arr_counts)>0 else 1
-# place at interval centers
-for i in range(len(time_range)-1):
-    t1 = time_range[i]; t2 = time_range[i+1]
-    mid = t1 + (t2 - t1)/2
+max_d = max(dep_counts) if dep_counts else 1
+max_a = max(arr_counts) if arr_counts else 1
+
+# place at interval centers (use mid_times)
+for i, mid in enumerate(mid_times):
     d = dep_counts[i]; a = arr_counts[i]
 
-    # >>> 추가: 합계(검정, 최상단). 0이면 출력하지 않음.
+    # 합계(검정, 최상단) — 0이면 표시 안 함
     total_val = d + a
     if total_val > 0:
         ax1.text(mid, -0.06, str(total_val), transform=trans,
                  ha="center", va="top", fontsize=8, color="black")
-        
-    if d>0:
-        alpha = 0.35 + 0.65*(d/max_d)
+
+    if d > 0:
+        alpha = 0.35 + 0.65 * (d / max_d)
         ax1.text(mid, -0.10, str(d), transform=trans, ha="center", va="top",
-                 fontsize=8, color=(0.84,0.15,0.16, alpha))  # red RGBA with alpha (Departure)
-    if a>0:
-        alpha = 0.35 + 0.65*(a/max_a)
+                 fontsize=8, color=(0.84, 0.15, 0.16, alpha))  # Departure (red)
+
+    if a > 0:
+        alpha = 0.35 + 0.65 * (a / max_a)
         ax1.text(mid, -0.14, str(a), transform=trans, ha="center", va="top",
-                 fontsize=8, color=(0.12,0.46,0.70, alpha))  # blue RGBA with alpha (Arrival)
+                 fontsize=8, color=(0.12, 0.46, 0.70, alpha))  # Arrival (blue)
+
+
 
 # Align x-limits and grid without gray bands
 ax1.set_xlim(start_time, end_time)
