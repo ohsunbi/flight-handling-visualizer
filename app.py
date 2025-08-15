@@ -426,7 +426,10 @@ ax1.grid(True, axis="x", linestyle="--", alpha=0.3)
 
 # ----- Save / Download chart image -----
 # filename: YYYY-MM-DD_Weekday_D{dep}_A{arr}.png
-filename = f"{base_date.strftime('%Y-%m-%d')}_{base_date.strftime('%a')}_D{total_dep}_A{total_arr}.png"
+extra_tag = "(E)" if use_extra else ""
+filename = f"{base_date.strftime('%Y-%m-%d')}_{base_date.strftime('%a')}_D{total_dep}_A{total_arr}{extra_tag}.png"
+
+
 
 # Create PNG bytes
 buf = io.BytesIO()
