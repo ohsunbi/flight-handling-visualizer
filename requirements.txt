@@ -2,4 +2,3 @@ streamlit
 pandas
 matplotlib
 openpyxl\nplotly\n\n
-plotly

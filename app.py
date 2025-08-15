@@ -5,6 +5,16 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib import rcParams
+
+# --- Ensure plotly is available even if requirements install was skipped/cached ---
+import sys, subprocess
+try:
+    import plotly  # noqa: F401
+except Exception:
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", "plotly"])
+    except Exception as _e:
+        print("Plotly auto-install failed:", _e)
 from datetime import datetime, date, time, timedelta
 
 # Optional interactive timeline
