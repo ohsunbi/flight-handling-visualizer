@@ -411,6 +411,13 @@ for i in range(len(time_range)-1):
     t1 = time_range[i]; t2 = time_range[i+1]
     mid = t1 + (t2 - t1)/2
     d = dep_counts[i]; a = arr_counts[i]
+
+    # >>> 추가: 합계(검정, 최상단). 0이면 출력하지 않음.
+    total_val = d + a
+    if total_val > 0:
+        ax1.text(mid, -0.005, str(total_val), transform=trans,
+                 ha="center", va="top", fontsize=8, color="black")
+        
     if d>0:
         alpha = 0.35 + 0.65*(d/max_d)
         ax1.text(mid, -0.045, str(d), transform=trans, ha="center", va="top",
