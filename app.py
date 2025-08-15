@@ -276,5 +276,22 @@ if 'extra_arr' in locals() and extra_arr is not None:
 ax1.set_xlim(start_time, end_time)
 ax1.grid(True, axis="x", linestyle="--", alpha=0.3)
 
+# ----- Save / Download chart image -----
+# filename: YYYY-MM-DD_Weekday_D{dep}_A{arr}.png
+filename = f"{base_date.strftime('%Y-%m-%d')}_{base_date.strftime('%a')}_D{total_dep}_A{total_arr}.png"
+
+# Create PNG bytes
+buf = io.BytesIO()
+fig1.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+buf.seek(0)
+
+# Download button
+st.download_button(
+    label="Download chart as PNG",
+    data=buf,
+    file_name=filename,
+    mime="image/png"
+)
+
 # Render
 st.pyplot(fig1, use_container_width=True)
