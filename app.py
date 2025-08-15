@@ -16,6 +16,9 @@ service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min
 base_date = st.sidebar.date_input("BASE_DATE", value=date.today())
 interval_min = st.sidebar.selectbox("Overlap interval (min)", options=[10, 20, 30], index=0)
 
+# Extra 데이터 ON/OFF 토글 추가
+use_extra = st.sidebar.checkbox("Include Extra data", value=True)
+
 st.sidebar.subheader("Operation windows (minutes)")
 dep_before = st.sidebar.number_input("Departure window start (before ATD)", 0, 240, 50, 5)
 dep_after  = st.sidebar.number_input("Departure window end (after ATD)", 0, 240, 10, 5)
@@ -193,6 +196,9 @@ elif dep_file is not None and arr_file is not None:
 else:
     st.info("Upload departures & arrivals (and optional extra data), or click 'Load sample data'.")
     st.stop()
+
+if not use_extra:
+    extra_df = None
 
 def hhmm_text(v):
     s = str(v).zfill(4)
