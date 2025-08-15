@@ -144,14 +144,31 @@ def load_extra(file):
     return out
 
 def hhmm_to_datetime(base_date, hhmm, service_hour):
-    s = str(hhmm).strip()
-    if s.isdigit() and len(s) in (3,4):
-        s = s.zfill(4)
-    tt = datetime.strptime(s, "%H%M").time()
+    # accept: 930, "0930", "9:30", "09:30", 930.0, Timestamp, datetime, etc.
+    if pd.isna(hhmm):
+        return None
+
+    # datetime / Timestamp 그대로 사용
+    if isinstance(hhmm, (datetime, pd.Timestamp)):
+        tt = hhmm.time()
+    else:
+        s = str(hhmm).strip()
+        # 숫자만 추출 (콜론/공백/점 등 제거)
+        digits = "".join(ch for ch in s if ch.isdigit())
+        if len(digits) == 3:   # e.g., "930" -> "0930"
+            digits = "0" + digits
+        if len(digits) != 4:
+            return None
+        try:
+            tt = datetime.strptime(digits, "%H%M").time()
+        except ValueError:
+            return None
+
     dt = datetime.combine(base_date, tt)
     if time(tt.hour, tt.minute) < time(service_hour, 0):
         dt += timedelta(days=1)
     return dt
+
 
 # Load data
 if use_sample:
@@ -193,11 +210,13 @@ dep_df["TIME_RAW"] = dep_df.apply(pick_time_dep, axis=1)
 dep_df = dep_df[pd.notna(dep_df["TIME_RAW"])].reset_index(drop=True)  # drop rows with no time
 
 dep_df["time_dt"] = dep_df["TIME_RAW"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
+dep_df = dep_df[pd.notna(dep_df["time_dt"])].reset_index(drop=True)
+
 dep_df["start"]   = dep_df["time_dt"] - timedelta(minutes=int(dep_before))
 dep_df["end"]     = dep_df["time_dt"] + timedelta(minutes=int(dep_after))
 dep_df["marker"]  = dep_df["time_dt"]
 dep_df["type"]    = "DEP"
-dep_df["time_str"]= dep_df["TIME_RAW"].apply(hhmm_text)
+dep_df["time_str"] = dep_df["time_dt"].dt.strftime("%H:%M")
 dep_df["Label"]   = dep_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
 
 # ---- ARRIVALS (ATA > ETA > STA) ----
@@ -214,11 +233,13 @@ arr_df["TIME_RAW"] = arr_df.apply(pick_time_arr, axis=1)
 arr_df = arr_df[pd.notna(arr_df["TIME_RAW"])].reset_index(drop=True)  # drop rows with no time
 
 arr_df["time_dt"] = arr_df["TIME_RAW"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
+arr_df = arr_df[pd.notna(arr_df["time_dt"])].reset_index(drop=True)
+
 arr_df["start"]   = arr_df["time_dt"] - timedelta(minutes=int(arr_before))
 arr_df["end"]     = arr_df["time_dt"] + timedelta(minutes=int(arr_after))
 arr_df["marker"]  = arr_df["time_dt"]
 arr_df["type"]    = "ARR"
-arr_df["time_str"]= arr_df["TIME_RAW"].apply(hhmm_text)
+arr_df["time_str"] = arr_df["time_dt"].dt.strftime("%H:%M")
 arr_df["Label"]   = arr_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
 
 # Extra split (unchanged logic: extras still use ATA/ATD when present)
