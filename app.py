@@ -194,8 +194,8 @@ for i, row in dep_block.iterrows():
     if row["Label"]:
         ax1.text(row["end"] + timedelta(minutes=5), i, row["Label"], va="center", fontsize=8, color=color)
     ax1.plot(row["marker"], i, marker=("D" if is_extra else "o"), color=color)
-    ax1.text(row["marker"] - timedelta(minutes=3), i-0.15, row["time_str"],
-             fontsize=7, color=color, ha="right", va="top")
+    ax1.text(row["marker"] - timedelta(minutes=3), i+0.15, row["time_str"],
+             fontsize=7, color=color, ha="right", va="bottom")
 
 # arrivals block
 arr_block = pd.concat([
@@ -212,8 +212,8 @@ for i, row in arr_block.iterrows():
     if row["Label"]:
         ax1.text(row["end"] + timedelta(minutes=5), y, row["Label"], va="center", fontsize=8, color=color)
     ax1.plot(row["marker"], y, marker=("D" if is_extra else "o"), color=color)
-    ax1.text(row["marker"] - timedelta(minutes=3), y-0.15, row["time_str"],
-             fontsize=7, color=color, ha="right", va="top")
+    ax1.text(row["marker"] - timedelta(minutes=3), y+0.15, row["time_str"],
+             fontsize=7, color=color, ha="right", va="bottom")
 
 # Totals and legend
 total_dep = len(dep_block)
