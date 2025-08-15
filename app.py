@@ -415,16 +415,16 @@ for i in range(len(time_range)-1):
     # >>> 추가: 합계(검정, 최상단). 0이면 출력하지 않음.
     total_val = d + a
     if total_val > 0:
-        ax1.text(mid, -0.12, str(total_val), transform=trans,
+        ax1.text(mid, -0.06, str(total_val), transform=trans,
                  ha="center", va="top", fontsize=8, color="black")
         
     if d>0:
         alpha = 0.35 + 0.65*(d/max_d)
-        ax1.text(mid, -0.16, str(d), transform=trans, ha="center", va="top",
+        ax1.text(mid, -0.10, str(d), transform=trans, ha="center", va="top",
                  fontsize=8, color=(0.84,0.15,0.16, alpha))  # red RGBA with alpha (Departure)
     if a>0:
         alpha = 0.35 + 0.65*(a/max_a)
-        ax1.text(mid, -0.20, str(a), transform=trans, ha="center", va="top",
+        ax1.text(mid, -0.14, str(a), transform=trans, ha="center", va="top",
                  fontsize=8, color=(0.12,0.46,0.70, alpha))  # blue RGBA with alpha (Arrival)
 
 # Align x-limits and grid without gray bands
