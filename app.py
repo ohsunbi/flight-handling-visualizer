@@ -1,5 +1,6 @@
 
 import io
+import math
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -144,23 +145,33 @@ def load_extra(file):
     return out
 
 def hhmm_to_datetime(base_date, hhmm, service_hour):
-    # accept: 930, "0930", "9:30", "09:30", 930.0, Timestamp, datetime, etc.
+    # 1) NA 처리
     if pd.isna(hhmm):
         return None
 
-    # datetime / Timestamp 그대로 사용
+    # 2) datetime/Timestamp는 그대로 사용
     if isinstance(hhmm, (datetime, pd.Timestamp)):
         tt = hhmm.time()
     else:
-        s = str(hhmm).strip()
-        # 숫자만 추출 (콜론/공백/점 등 제거)
-        digits = "".join(ch for ch in s if ch.isdigit())
-        if len(digits) == 3:   # e.g., "930" -> "0930"
-            digits = "0" + digits
-        if len(digits) != 4:
+        # 3) 숫자면 반올림→정수→4자리 제로패딩 (313.0 -> "0313")
+        if isinstance(hhmm, (int, float)) and not (isinstance(hhmm, float) and math.isnan(hhmm)):
+            try:
+                val = int(round(hhmm))
+                s = f"{val:04d}"
+            except Exception:
+                return None
+        else:
+            # 4) 문자열이면 숫자만 추출 + 3자리면 0 패드
+            s_raw = str(hhmm).strip()
+            digits = "".join(ch for ch in s_raw if ch.isdigit())
+            if len(digits) == 3:
+                digits = "0" + digits
+            s = digits
+
+        if len(s) != 4:
             return None
         try:
-            tt = datetime.strptime(digits, "%H%M").time()
+            tt = datetime.strptime(s, "%H%M").time()
         except ValueError:
             return None
 
@@ -168,6 +179,7 @@ def hhmm_to_datetime(base_date, hhmm, service_hour):
     if time(tt.hour, tt.minute) < time(service_hour, 0):
         dt += timedelta(days=1)
     return dt
+
 
 
 # Load data
