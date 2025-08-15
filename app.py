@@ -124,7 +124,7 @@ arr_df["end"]   = arr_df["ATA_dt"] + timedelta(minutes=int(arr_after))
 arr_df["marker"] = arr_df["ATA_dt"]; arr_df["type"] = "ARR"; arr_df["time_str"] = arr_df["ATA"].apply(hhmm_text)
 arr_df["Label"] = arr_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
 
-# Extra data -> split into dep-like (ATD present) and arr-like (ATA present)
+# Extra data -> split into dep-like and arr-like, but with lighter colors later
 extra_dep = None; extra_arr = None
 if extra_df is not None and len(extra_df) > 0:
     ex = extra_df.copy()
@@ -154,23 +154,29 @@ if extra_df is not None and len(extra_df) > 0:
 # ---- Top panel: classic split ----
 fig1, ax1 = plt.subplots(figsize=(12, 8))
 
-# departures block: base + extra (dotted)
+# Colors (normal vs lighter for extra)
+COL_DEP = "#1f77b4"     # blue
+COL_ARR = "#d62728"     # red
+COL_DEP_EX = "#9ecae1"  # light blue
+COL_ARR_EX = "#fcbba1"  # light red
+
+# departures block
 dep_block = pd.concat([
     dep_df[["Label","start","end","marker","type","time_str"]],
     (extra_dep if extra_dep is not None else pd.DataFrame(columns=["Label","start","end","marker","type","time_str"]))
 ], ignore_index=True).sort_values("start").reset_index(drop=True)
 
 for i, row in dep_block.iterrows():
-    dotted = ("EXTRA" in row["type"])
-    style = (0,(1,2)) if dotted else '-'   # tight dotted for extra
-    ax1.plot([row["start"], row["end"]], [i, i], color="blue", linewidth=4, linestyle=style, alpha=0.95 if dotted else 1.0,
-             label="Departure" if (i==0 and not dotted) else ("Departure (extra)" if (i==0 and dotted) else ""))
+    is_extra = ("EXTRA" in row["type"])
+    color = COL_DEP_EX if is_extra else COL_DEP
+    label_once = "Departure (extra)" if (i==0 and is_extra) else ("Departure" if (i==0 and not is_extra) else "")
+    ax1.plot([row["start"], row["end"]], [i, i], color=color, linewidth=4, label=label_once, alpha=0.9 if is_extra else 1.0)
     if row["Label"]:
-        ax1.text(row["end"] + timedelta(minutes=5), i, row["Label"], va="center", fontsize=8, color="blue")
-    ax1.plot(row["marker"], i, marker=("D" if dotted else "o"), color="blue")
-    ax1.text(row["marker"] + timedelta(minutes=3), i+0.15, row["time_str"], fontsize=7, color="blue")
+        ax1.text(row["end"] + timedelta(minutes=5), i, row["Label"], va="center", fontsize=8, color=color)
+    ax1.plot(row["marker"], i, marker="o", color=color)
+    ax1.text(row["marker"] + timedelta(minutes=3), i+0.15, row["time_str"], fontsize=7, color=color)
 
-# arrivals block: base + extra (dotted), plotted below departures with offset 0.4
+# arrivals block
 arr_block = pd.concat([
     arr_df[["Label","start","end","marker","type","time_str"]],
     (extra_arr if extra_arr is not None else pd.DataFrame(columns=["Label","start","end","marker","type","time_str"]))
@@ -178,16 +184,16 @@ arr_block = pd.concat([
 
 for i, row in arr_block.iterrows():
     y = i + 0.4
-    dotted = ("EXTRA" in row["type"])
-    style = (0,(1,2)) if dotted else '-'
-    ax1.plot([row["start"], row["end"]], [y, y], color="red", linewidth=4, linestyle=style, alpha=0.95 if dotted else 1.0,
-             label="Arrival" if (i==0 and not dotted) else ("Arrival (extra)" if (i==0 and dotted) else ""))
+    is_extra = ("EXTRA" in row["type"])
+    color = COL_ARR_EX if is_extra else COL_ARR
+    label_once = "Arrival (extra)" if (i==0 and is_extra) else ("Arrival" if (i==0 and not is_extra) else "")
+    ax1.plot([row["start"], row["end"]], [y, y], color=color, linewidth=4, label=label_once, alpha=0.9 if is_extra else 1.0)
     if row["Label"]:
-        ax1.text(row["end"] + timedelta(minutes=5), y, row["Label"], va="center", fontsize=8, color="red")
-    ax1.plot(row["marker"], y, marker=("D" if dotted else "o"), color="red")
-    ax1.text(row["marker"] + timedelta(minutes=3), y+0.15, row["time_str"], fontsize=7, color="red")
+        ax1.text(row["end"] + timedelta(minutes=5), y, row["Label"], va="center", fontsize=8, color=color)
+    ax1.plot(row["marker"], y, marker="o", color=color)
+    ax1.text(row["marker"] + timedelta(minutes=3), y+0.15, row["time_str"], fontsize=7, color=color)
 
-# totals (including extra)
+# totals
 total_dep = len(dep_block)
 total_arr = len(arr_block)
 ax1.text(0.01, 1.02, f"Date: {base_date.strftime('%Y-%m-%d')}", transform=ax1.transAxes, fontsize=11, ha="left", va="bottom")
@@ -201,13 +207,12 @@ for lbl in ax1.get_xticklabels(): lbl.set_rotation(0); lbl.set_ha('center')
 ax1.set_title("Flight Handling Timeline")
 ax1.grid(True, axis="x", linestyle="--", alpha=0.3)
 
-# ---- Overlap line (include extra in counts) ----
+# ---- Overlap counts (text grid under timeline) ----
 def _to_intervals(df):
     return df[["start","end"]].copy()
 
 dep_intervals = _to_intervals(dep_block)
 arr_intervals = _to_intervals(arr_block)
-
 start_time = min(dep_intervals["start"].min() if len(dep_intervals)>0 else pd.Timestamp(base_date),
                  arr_intervals["start"].min() if len(arr_intervals)>0 else pd.Timestamp(base_date))
 end_time   = max(dep_intervals["end"].max() if len(dep_intervals)>0 else pd.Timestamp(base_date)+timedelta(hours=23,minutes=59),
@@ -219,28 +224,21 @@ def count_overlaps(intervals, t):
     if len(intervals)==0: return 0
     return ((intervals["start"] <= t) & (intervals["end"] > t)).sum()
 
-dep_counts = [count_overlaps(dep_intervals, t) for t in time_range]
-arr_counts = [count_overlaps(arr_intervals, t) for t in time_range]
+rows = []
+for t in time_range:
+    d = count_overlaps(dep_intervals, t)
+    a = count_overlaps(arr_intervals, t)
+    rows.append((t.strftime("%H:%M"), d, a))
 
-fig2, ax2 = plt.subplots(figsize=(12, 3.5))
-ax2.plot(time_range, dep_counts, label="Departure (incl. extra)", color="blue", linewidth=2)
-ax2.plot(time_range, arr_counts, label="Arrival (incl. extra)", color="red", linewidth=2)
-
-# annotate counts and hide y-axis to align with top
-for x, d, a in zip(time_range, dep_counts, arr_counts):
-    if d>0: ax2.text(x, d + 0.05, str(d), fontsize=8, ha="center", va="bottom", color="blue")
-    if a>0: ax2.text(x, a + 0.05, str(a), fontsize=8, ha="center", va="bottom", color="red")
-
-ax2.legend()
-ax2.grid(True, alpha=0.3)
-ax2.set_ylabel("")
-ax2.set_yticks([])
-ax2.tick_params(axis='y', left=False)
-ax2.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-for lbl in ax2.get_xticklabels(): lbl.set_rotation(0); lbl.set_ha('center')
-ax2.set_title(f"Overlapping Flights (every {interval_min} min)")
-ax1.set_xlim(start_time, end_time); ax2.set_xlim(start_time, end_time)
-
-# ---- Render ----
+# Render charts and text grid
 st.pyplot(fig1, use_container_width=True)
-st.pyplot(fig2, use_container_width=True)
+
+# Compact, borderless text grid
+st.markdown("**Overlapping flights (every {} min)**".format(interval_min))
+# format into aligned monospace columns
+colw = [8, 12, 12]
+header = f"{'Time':<{colw[0]}}{'Departure':<{colw[1]}}{'Arrival':<{colw[2]}}"
+lines = [header, "-" * (sum(colw)+2)]
+for tm, d, a in rows:
+    lines.append(f"{tm:<{colw[0]}}{str(d):<{colw[1]}}{str(a):<{colw[2]}}")
+st.code("\n".join(lines), language="text")
