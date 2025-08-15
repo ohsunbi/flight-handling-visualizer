@@ -238,11 +238,11 @@ for i in range(len(time_range)-1):
     if d>0:
         alpha = 0.35 + 0.65*(d/max_d)
         ax1.text(mid, -0.045, str(d), transform=trans, ha="center", va="top",
-                 fontsize=8, color=(0.12,0.46,0.70, alpha))  # blue RGBA with alpha
+                 fontsize=8, color=(0.84,0.15,0.16, alpha))  # red RGBA with alpha
     if a>0:
         alpha = 0.35 + 0.65*(a/max_a)
         ax1.text(mid, -0.095, str(a), transform=trans, ha="center", va="top",
-                 fontsize=8, color=(0.84,0.15,0.16, alpha))  # red RGBA with alpha
+                 fontsize=8, color=(0.12,0.46,0.70, alpha))  # blue RGBA with alpha
 
 # Align x-limits and grid without gray bands
 start_time = min(dep_df["start"].min(), arr_df["start"].min())
