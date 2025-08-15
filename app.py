@@ -186,10 +186,19 @@ dep_block = pd.concat([
     (extra_dep if extra_dep is not None else pd.DataFrame(columns=["Label","start","end","marker","type","time_str"]))
 ], ignore_index=True).sort_values("start").reset_index(drop=True)
 
+dep_normal_labeled = False
+dep_extra_labeled = False
 for i, row in dep_block.iterrows():
     is_extra = ("EXTRA" in row["type"])
     color = COL_DEP_EX if is_extra else COL_DEP
-    label_once = "Departure (extra)" if (i==0 and is_extra) else ("Departure" if (i==0 and not is_extra) else "")
+    if is_extra:
+        label_once = "Departure (extra)" if not dep_extra_labeled else ""
+        dep_extra_labeled = True
+    else:
+        label_once = "Departure" if not dep_normal_labeled else ""
+        dep_normal_labeled = True
+
+    
     ax1.plot([row["start"], row["end"]], [i, i], color=color, linewidth=4, label=label_once)
     if row["Label"]:
         ax1.text(row["end"] + timedelta(minutes=5), i, row["Label"], va="center", fontsize=8, color=color)
@@ -203,11 +212,19 @@ arr_block = pd.concat([
     (extra_arr if extra_arr is not None else pd.DataFrame(columns=["Label","start","end","marker","type","time_str"]))
 ], ignore_index=True).sort_values("start").reset_index(drop=True)
 
+arr_normal_labeled = False
+arr_extra_labeled = False
 for i, row in arr_block.iterrows():
     y = i + 0.6
     is_extra = ("EXTRA" in row["type"])
     color = COL_ARR_EX if is_extra else COL_ARR
-    label_once = "Arrival (extra)" if (i==0 and is_extra) else ("Arrival" if (i==0 and not is_extra) else "")
+    if is_extra:
+        label_once = "Arrival (extra)" if not arr_extra_labeled else ""
+        arr_extra_labeled = True
+    else:
+        label_once = "Arrival" if not arr_normal_labeled else ""
+        arr_normal_labeled = True
+
     ax1.plot([row["start"], row["end"]], [y, y], color=color, linewidth=4, label=label_once)
     if row["Label"]:
         ax1.text(row["end"] + timedelta(minutes=5), y, row["Label"], va="center", fontsize=8, color=color)
