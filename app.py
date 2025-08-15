@@ -4,7 +4,6 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.lines import Line2D
 from matplotlib import transforms
 from datetime import datetime, date, time, timedelta
 
@@ -30,8 +29,8 @@ st.title(f"Flight Handling Schedule ({base_date.strftime('%Y-%m-%d')})")
 
 st.sidebar.markdown("---")
 st.sidebar.write("Upload files with headers:")
-st.sidebar.write("- Departures: **FLT, ATD, REG**")
-st.sidebar.write("- Arrivals: **FLT, ATA, REG**")
+st.sidebar.write("- Departures: **FLT, ATD, (optional: ETD, STD), REG**")
+st.sidebar.write("- Arrivals: **FLT, ATA, (optional: ETA, STA), REG**")
 st.sidebar.write("- Extra data (mixed dep/arr): **FLT, DES, ATA, ATD**  (HHMM)")
 
 col1, col2, col3 = st.columns(3)
@@ -48,23 +47,17 @@ with col_btn1:
 with col_btn2:
     reset_data = st.button("Reset data")
 
-# Reset logic (replace this block)
+# Reset logic
 if reset_data:
     # clear file uploaders & any temp flags
     for k in ("dep", "arr", "extra"):
         st.session_state.pop(k, None)
-
-    # if you stored any dataframes/flags in session_state, clear them too (optional)
     for k in ("dep_df", "arr_df", "extra_df", "use_sample"):
         st.session_state.pop(k, None)
-
-    # rerun (new API)
     if hasattr(st, "rerun"):
         st.rerun()
     else:
-        # fallback for very old Streamlit
         st.experimental_rerun()
-
 
 def find_col(df, target):
     target = target.strip().upper()
@@ -74,27 +67,81 @@ def find_col(df, target):
     raise KeyError(f"Required column '{target}' not found.")
 
 def read_tabular(file):
-    name = file.name.lower()
-    if name.endswith(".csv"):
-        return pd.read_csv(file)
+    # file is an UploadedFile with .name or a path-like when using samples
+    if hasattr(file, "name"):
+        name = file.name.lower()
+        if name.endswith(".csv"):
+            return pd.read_csv(file)
+        else:
+            return pd.read_excel(file)
     else:
-        return pd.read_excel(file)
+        # assume it's a path string
+        p = str(file).lower()
+        if p.endswith(".csv"):
+            return pd.read_csv(file)
+        else:
+            return pd.read_excel(file)
 
 def load_dep(file):
     df = read_tabular(file)
-    c_flt = find_col(df, "FLT"); c_atd = find_col(df, "ATD"); c_reg = find_col(df, "REG")
-    out = df[[c_flt, c_atd, c_reg]].copy(); out.columns = ["FLT","ATD","REG"]; return out
+    # case-insensitive column map
+    cmap = {str(c).strip().upper(): c for c in df.columns}
+
+    def get(col):
+        return df[cmap[col]] if col in cmap else pd.Series([pd.NA] * len(df))
+
+    if "FLT" not in cmap:
+        raise KeyError("Departures must include FLT column.")
+    c_flt = cmap["FLT"]
+    reg_series = get("REG")
+    out = pd.DataFrame({
+        "FLT": df[c_flt],
+        "REG": reg_series if reg_series is not None else ""
+    })
+    # optional time columns: ATD > ETD > STD
+    out["ATD"] = get("ATD")
+    out["ETD"] = get("ETD")
+    out["STD"] = get("STD")
+    return out
 
 def load_arr(file):
     df = read_tabular(file)
-    c_flt = find_col(df, "FLT"); c_ata = find_col(df, "ATA"); c_reg = find_col(df, "REG")
-    out = df[[c_flt, c_ata, c_reg]].copy(); out.columns = ["FLT","ATA","REG"]; return out
+    cmap = {str(c).strip().upper(): c for c in df.columns}
+
+    def get(col):
+        return df[cmap[col]] if col in cmap else pd.Series([pd.NA] * len(df))
+
+    if "FLT" not in cmap:
+        raise KeyError("Arrivals must include FLT column.")
+    c_flt = cmap["FLT"]
+    reg_series = get("REG")
+    out = pd.DataFrame({
+        "FLT": df[c_flt],
+        "REG": reg_series if reg_series is not None else ""
+    })
+    # optional time columns: ATA > ETA > STA
+    out["ATA"] = get("ATA")
+    out["ETA"] = get("ETA")
+    out["STA"] = get("STA")
+    return out
 
 def load_extra(file):
     if file is None: return None
     df = read_tabular(file)
-    c_flt = find_col(df, "FLT"); c_des = find_col(df, "DES"); c_ata = find_col(df, "ATA"); c_atd = find_col(df, "ATD")
-    out = df[[c_flt, c_des, c_ata, c_atd]].copy(); out.columns = ["FLT","DES","ATA","ATD"]; return out
+    # require FLT and at least one of ATA/ATD for extra
+    cmap = {str(c).strip().upper(): c for c in df.columns}
+    if "FLT" not in cmap:
+        raise KeyError("Extra must include FLT column.")
+    c_flt = cmap["FLT"]
+    # DES optional
+    des_col = cmap["DES"] if "DES" in cmap else None
+    ata_col = cmap["ATA"] if "ATA" in cmap else None
+    atd_col = cmap["ATD"] if "ATD" in cmap else None
+    out = pd.DataFrame({"FLT": df[c_flt]})
+    if des_col: out["DES"] = df[des_col]
+    if ata_col: out["ATA"] = df[ata_col]
+    if atd_col: out["ATD"] = df[atd_col]
+    return out
 
 def hhmm_to_datetime(base_date, hhmm, service_hour):
     s = str(hhmm).strip()
@@ -128,24 +175,57 @@ def label_for(flt, reg):
     if show_reg and pd.notna(reg) and str(reg).strip(): parts.append(str(reg))
     return " / ".join(parts)
 
-# Compute windows
+# ==============================
+# Compute windows with fallbacks
+# ==============================
+
+# ---- DEPARTURES (ATD > ETD > STD) ----
 dep_df = dep_df.copy()
-dep_df["ATD_dt"] = dep_df["ATD"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
-dep_df["start"] = dep_df["ATD_dt"] - timedelta(minutes=int(dep_before))
-dep_df["end"]   = dep_df["ATD_dt"] + timedelta(minutes=int(dep_after))
-dep_df["marker"] = dep_df["ATD_dt"]; dep_df["type"] = "DEP"; dep_df["time_str"] = dep_df["ATD"].apply(hhmm_text)
-dep_df["Label"] = dep_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
 
+def pick_time_dep(r):
+    for k in ("ATD", "ETD", "STD"):
+        v = r.get(k, pd.NA)
+        if pd.notna(v) and str(v).strip() != "":
+            return v
+    return pd.NA
+
+dep_df["TIME_RAW"] = dep_df.apply(pick_time_dep, axis=1)
+dep_df = dep_df[pd.notna(dep_df["TIME_RAW"])].reset_index(drop=True)  # drop rows with no time
+
+dep_df["time_dt"] = dep_df["TIME_RAW"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
+dep_df["start"]   = dep_df["time_dt"] - timedelta(minutes=int(dep_before))
+dep_df["end"]     = dep_df["time_dt"] + timedelta(minutes=int(dep_after))
+dep_df["marker"]  = dep_df["time_dt"]
+dep_df["type"]    = "DEP"
+dep_df["time_str"]= dep_df["TIME_RAW"].apply(hhmm_text)
+dep_df["Label"]   = dep_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
+
+# ---- ARRIVALS (ATA > ETA > STA) ----
 arr_df = arr_df.copy()
-arr_df["ATA_dt"] = arr_df["ATA"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
-arr_df["start"] = arr_df["ATA_dt"] - timedelta(minutes=int(arr_before))
-arr_df["end"]   = arr_df["ATA_dt"] + timedelta(minutes=int(arr_after))
-arr_df["marker"] = arr_df["ATA_dt"]; arr_df["type"] = "ARR"; arr_df["time_str"] = arr_df["ATA"].apply(hhmm_text)
-arr_df["Label"] = arr_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
 
-# Extra split
+def pick_time_arr(r):
+    for k in ("ATA", "ETA", "STA"):
+        v = r.get(k, pd.NA)
+        if pd.notna(v) and str(v).strip() != "":
+            return v
+    return pd.NA
+
+arr_df["TIME_RAW"] = arr_df.apply(pick_time_arr, axis=1)
+arr_df = arr_df[pd.notna(arr_df["TIME_RAW"])].reset_index(drop=True)  # drop rows with no time
+
+arr_df["time_dt"] = arr_df["TIME_RAW"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
+arr_df["start"]   = arr_df["time_dt"] - timedelta(minutes=int(arr_before))
+arr_df["end"]     = arr_df["time_dt"] + timedelta(minutes=int(arr_after))
+arr_df["marker"]  = arr_df["time_dt"]
+arr_df["type"]    = "ARR"
+arr_df["time_str"]= arr_df["TIME_RAW"].apply(hhmm_text)
+arr_df["Label"]   = arr_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
+
+# Extra split (unchanged logic: extras still use ATA/ATD when present)
 extra_dep = None; extra_arr = None
-if extra_df is not None and len(extra_df) > 0:
+if isinstance(extra_file, type(None)) and use_sample and isinstance(extra_df, pd.DataFrame):
+    pass  # sample already loaded
+if extra_df is not None and isinstance(extra_df, pd.DataFrame) and len(extra_df) > 0:
     ex = extra_df.copy()
     if "ATD" in ex.columns:
         ed = ex[ex["ATD"].notna()].copy()
@@ -156,7 +236,7 @@ if extra_df is not None and len(extra_df) > 0:
             ed["marker"] = ed["ATD_dt"]
             ed["type"] = "DEP_EXTRA"
             ed["time_str"] = ed["ATD"].apply(hhmm_text)
-            ed["Label"] = ed.apply(lambda r: label_for(str(r["FLT"]).replace("ESR","ZE"), r.get("REG","")), axis=1) if ("REG" in ed.columns) else ed["FLT"].apply(lambda f: label_for(str(f).replace("ESR","ZE"), ""))
+            ed["Label"] = ed.apply(lambda r: label_for(str(r.get("FLT","")).replace("ESR","ZE"), r.get("REG","")), axis=1) if ("REG" in ed.columns) else ed["FLT"].apply(lambda f: label_for(str(f).replace("ESR","ZE"), ""))
             extra_dep = ed[["Label","start","end","marker","type","time_str"]]
     if "ATA" in ex.columns:
         ea = ex[ex["ATA"].notna()].copy()
@@ -167,28 +247,41 @@ if extra_df is not None and len(extra_df) > 0:
             ea["marker"] = ea["ATA_dt"]
             ea["type"] = "ARR_EXTRA"
             ea["time_str"] = ea["ATA"].apply(hhmm_text)
-            ea["Label"] = ea.apply(lambda r: label_for(str(r["FLT"]).replace("ESR","ZE"), r.get("REG","")), axis=1) if ("REG" in ea.columns) else ea["FLT"].apply(lambda f: label_for(str(f).replace("ESR","ZE"), ""))
+            ea["Label"] = ea.apply(lambda r: label_for(str(r.get("FLT","")).replace("ESR","ZE"), r.get("REG","")), axis=1) if ("REG" in ea.columns) else ea["FLT"].apply(lambda f: label_for(str(f).replace("ESR","ZE"), ""))
             extra_arr = ea[["Label","start","end","marker","type","time_str"]]
 
-# Colors
-COL_ARR = "#1f77b4"      # blue (base)
-COL_DEP = "#d62728"      # red (base)
-COL_ARR_EX = "#17becf"   # cyan for extra dep
-COL_DEP_EX = "#ff7f0e"   # orange for extra arr
+# Colors (Reversed scheme: Arrivals blue, Departures red; extras cyan/orange)
+COL_ARR    = "#1f77b4"   # blue
+COL_DEP    = "#d62728"   # red
+COL_ARR_EX = "#17becf"   # cyan (arrival extra)
+COL_DEP_EX = "#ff7f0e"   # orange (departure extra)
 
 # ---- Build intervals for overlaps (incl. extras) ----
 def _to_intervals(df):
     return df[["start","end"]].copy()
 
-dep_intervals = _to_intervals(dep_df)
-arr_intervals = _to_intervals(arr_df)
-if extra_dep is not None: dep_intervals = pd.concat([dep_intervals, _to_intervals(extra_dep)], ignore_index=True)
-if extra_arr is not None: arr_intervals = pd.concat([arr_intervals, _to_intervals(extra_arr)], ignore_index=True)
+dep_intervals = _to_intervals(dep_df) if len(dep_df)>0 else pd.DataFrame(columns=["start","end"])
+arr_intervals = _to_intervals(arr_df) if len(arr_df)>0 else pd.DataFrame(columns=["start","end"])
+if extra_dep is not None and len(extra_dep)>0:
+    dep_intervals = pd.concat([dep_intervals, _to_intervals(extra_dep)], ignore_index=True)
+if extra_arr is not None and len(extra_arr)>0:
+    arr_intervals = pd.concat([arr_intervals, _to_intervals(extra_arr)], ignore_index=True)
 
-start_time = min(dep_intervals["start"].min() if len(dep_intervals)>0 else pd.Timestamp(base_date),
-                 arr_intervals["start"].min() if len(arr_intervals)>0 else pd.Timestamp(base_date))
-end_time   = max(dep_intervals["end"].max() if len(dep_intervals)>0 else pd.Timestamp(base_date)+timedelta(hours=23,minutes=59),
-                 arr_intervals["end"].max() if len(arr_intervals)>0 else pd.Timestamp(base_date)+timedelta(hours=23,minutes=59))
+if len(dep_intervals)==0 and len(arr_intervals)==0:
+    st.warning("No records to plot after applying time fallbacks.")
+    st.stop()
+
+start_candidates = []
+end_candidates = []
+if len(dep_intervals)>0:
+    start_candidates.append(dep_intervals["start"].min())
+    end_candidates.append(dep_intervals["end"].max())
+if len(arr_intervals)>0:
+    start_candidates.append(arr_intervals["start"].min())
+    end_candidates.append(arr_intervals["end"].max())
+
+start_time = min(start_candidates)
+end_time   = max(end_candidates)
 
 time_range = pd.date_range(start=start_time, end=end_time, freq=f"{interval_min}min")
 
@@ -205,7 +298,7 @@ fig1, ax1 = plt.subplots(figsize=(12, 8))
 # departures block
 dep_block = pd.concat([
     dep_df[["Label","start","end","marker","type","time_str"]],
-    (extra_dep if extra_dep is not None else pd.DataFrame(columns=["Label","start","end","marker","type","time_str"]))
+    (extra_dep if isinstance(extra_dep, pd.DataFrame) else pd.DataFrame(columns=["Label","start","end","marker","type","time_str"]))
 ], ignore_index=True).sort_values("start").reset_index(drop=True)
 
 dep_normal_labeled = False
@@ -220,18 +313,18 @@ for i, row in dep_block.iterrows():
         label_once = "Departure" if not dep_normal_labeled else ""
         dep_normal_labeled = True
 
-    
     ax1.plot([row["start"], row["end"]], [i, i], color=color, linewidth=4, label=label_once)
     if row["Label"]:
         ax1.text(row["end"] + timedelta(minutes=5), i, row["Label"], va="center", fontsize=8, color=color)
     ax1.plot(row["marker"], i, marker=("D" if is_extra else "o"), color=color)
+    # time label at top-left of marker
     ax1.text(row["marker"] - timedelta(minutes=3), i+0.15, row["time_str"],
              fontsize=7, color=color, ha="right", va="bottom")
 
 # arrivals block
 arr_block = pd.concat([
     arr_df[["Label","start","end","marker","type","time_str"]],
-    (extra_arr if extra_arr is not None else pd.DataFrame(columns=["Label","start","end","marker","type","time_str"]))
+    (extra_arr if isinstance(extra_arr, pd.DataFrame) else pd.DataFrame(columns=["Label","start","end","marker","type","time_str"]))
 ], ignore_index=True).sort_values("start").reset_index(drop=True)
 
 arr_normal_labeled = False
@@ -251,6 +344,7 @@ for i, row in arr_block.iterrows():
     if row["Label"]:
         ax1.text(row["end"] + timedelta(minutes=5), y, row["Label"], va="center", fontsize=8, color=color)
     ax1.plot(row["marker"], y, marker=("D" if is_extra else "o"), color=color)
+    # time label at top-left of marker
     ax1.text(row["marker"] - timedelta(minutes=3), y+0.15, row["time_str"],
              fontsize=7, color=color, ha="right", va="bottom")
 
@@ -267,7 +361,7 @@ ax1.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
 for lbl in ax1.get_xticklabels(): lbl.set_rotation(0); lbl.set_ha('center')
 ax1.set_title("Flight Handling Timeline")
 
-# Inline overlap numbers (two rows, numbers only, blue over red, darker for higher values)
+# Inline overlap numbers (two rows, top line = Departure (red), bottom line = Arrival (blue))
 trans = transforms.blended_transform_factory(ax1.transData, ax1.transAxes)
 max_d = max(dep_counts) if len(dep_counts)>0 else 1
 max_a = max(arr_counts) if len(arr_counts)>0 else 1
@@ -279,22 +373,13 @@ for i in range(len(time_range)-1):
     if d>0:
         alpha = 0.35 + 0.65*(d/max_d)
         ax1.text(mid, -0.045, str(d), transform=trans, ha="center", va="top",
-                 fontsize=8, color=(0.84,0.15,0.16, alpha))  # red RGBA with alpha
+                 fontsize=8, color=(0.84,0.15,0.16, alpha))  # red RGBA with alpha (Departure)
     if a>0:
         alpha = 0.35 + 0.65*(a/max_a)
         ax1.text(mid, -0.095, str(a), transform=trans, ha="center", va="top",
-                 fontsize=8, color=(0.12,0.46,0.70, alpha))  # blue RGBA with alpha
+                 fontsize=8, color=(0.12,0.46,0.70, alpha))  # blue RGBA with alpha (Arrival)
 
 # Align x-limits and grid without gray bands
-start_time = min(dep_df["start"].min(), arr_df["start"].min())
-end_time = max(dep_df["end"].max(), arr_df["end"].max())
-if 'extra_dep' in locals() and extra_dep is not None:
-    start_time = min(start_time, extra_dep["start"].min())
-    end_time = max(end_time, extra_dep["end"].max())
-if 'extra_arr' in locals() and extra_arr is not None:
-    start_time = min(start_time, extra_arr["start"].min())
-    end_time = max(end_time, extra_arr["end"].max())
-
 ax1.set_xlim(start_time, end_time)
 ax1.grid(True, axis="x", linestyle="--", alpha=0.3)
 
