@@ -210,7 +210,8 @@ dep_df["TIME_RAW"] = dep_df.apply(pick_time_dep, axis=1)
 dep_df = dep_df[pd.notna(dep_df["TIME_RAW"])].reset_index(drop=True)  # drop rows with no time
 
 dep_df["time_dt"] = dep_df["TIME_RAW"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
-dep_df = dep_df[pd.notna(dep_df["time_dt"])].reset_index(drop=True)
+dep_df["time_dt"] = pd.to_datetime(dep_df["time_dt"], errors="coerce")
+dep_df = dep_df.dropna(subset=["time_dt"]).reset_index(drop=True)
 
 dep_df["start"]   = dep_df["time_dt"] - timedelta(minutes=int(dep_before))
 dep_df["end"]     = dep_df["time_dt"] + timedelta(minutes=int(dep_after))
@@ -233,7 +234,8 @@ arr_df["TIME_RAW"] = arr_df.apply(pick_time_arr, axis=1)
 arr_df = arr_df[pd.notna(arr_df["TIME_RAW"])].reset_index(drop=True)  # drop rows with no time
 
 arr_df["time_dt"] = arr_df["TIME_RAW"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
-arr_df = arr_df[pd.notna(arr_df["time_dt"])].reset_index(drop=True)
+arr_df["time_dt"] = pd.to_datetime(arr_df["time_dt"], errors="coerce")
+arr_df = arr_df.dropna(subset=["time_dt"]).reset_index(drop=True)
 
 arr_df["start"]   = arr_df["time_dt"] - timedelta(minutes=int(arr_before))
 arr_df["end"]     = arr_df["time_dt"] + timedelta(minutes=int(arr_after))
