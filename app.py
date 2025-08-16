@@ -219,14 +219,13 @@ elif dep_file is not None and arr_file is not None:
     d_arr = infer_base_date_from_filename(arr_file.name)
 
     if "base_date_autoset_done" not in st.session_state:
-    st.session_state["base_date_autoset_done"] = False
+        st.session_state["base_date_autoset_done"] = False
 
     if (d_dep is not None and d_arr is not None and d_dep == d_arr
-    and not st.session_state["base_date_autoset_done"]):
-    # ↓↓↓ 직접 base_date를 즉시 바꾸지 말고, override에 담고 rerun
-    st.session_state["base_date_override"] = d_dep
-    st.session_state["base_date_autoset_done"] = True
-    st.rerun()
+        and not st.session_state["base_date_autoset_done"]):
+        st.session_state["base_date_override"] = d_dep
+        st.session_state["base_date_autoset_done"] = True
+        st.rerun()
 
     
     if d_dep is not None and d_arr is not None and d_dep == d_arr:
