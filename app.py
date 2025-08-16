@@ -10,6 +10,11 @@ from datetime import datetime, date, time, timedelta
 
 st.set_page_config(page_title="Flight Handling Schedule", layout="wide")
 
+
+# ===== Global Settings =====
+F_BEFORE = 20   # F 편일 때 기본 before 시간
+F_AFTER  = 10   # F 편일 때 기본 after 시간
+
 # ---- Sidebar controls ----
 st.sidebar.header("Settings")
 service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min_value=0, max_value=23, value=2, step=1)
@@ -234,10 +239,10 @@ dep_df = dep_df.dropna(subset=["time_dt"]).reset_index(drop=True)
 # F-flag
 dep_df["is_F"] = dep_df["FLT"].astype(str).str.strip().str.upper().str.endswith("F")
 dep_df["start"] = dep_df.apply(
-    lambda r: r["time_dt"] - timedelta(minutes=(20 if r["is_F"] else int(dep_before))), axis=1
+    lambda r: r["time_dt"] - timedelta(minutes=(F_BEFORE if r["is_F"] else int(dep_before))), axis=1
 )
 dep_df["end"] = dep_df.apply(
-    lambda r: r["time_dt"] + timedelta(minutes=(10 if r["is_F"] else int(dep_after))), axis=1
+    lambda r: r["time_dt"] + timedelta(minutes=(F_AFTER if r["is_F"] else int(dep_after))), axis=1
 )
 
 dep_df["marker"]  = dep_df["time_dt"]
@@ -268,10 +273,10 @@ arr_df["is_F"] = arr_df["FLT"].astype(str).str.strip().str.upper().str.endswith(
 
 # 변경: F면 -20 ~ +10, 아니면 기존 사이드바 값
 arr_df["start"] = arr_df.apply(
-    lambda r: r["time_dt"] - timedelta(minutes=(20 if r["is_F"] else int(arr_before))), axis=1
+    lambda r: r["time_dt"] - timedelta(minutes=(F_BEFORE if r["is_F"] else int(arr_before))), axis=1
 )
 arr_df["end"] = arr_df.apply(
-    lambda r: r["time_dt"] + timedelta(minutes=(10 if r["is_F"] else int(arr_after))), axis=1
+    lambda r: r["time_dt"] + timedelta(minutes=(F_AFTER if r["is_F"] else int(arr_after))), axis=1
 )
 
 arr_df["marker"]  = arr_df["time_dt"]
@@ -290,8 +295,8 @@ if extra_df is not None and isinstance(extra_df, pd.DataFrame) and len(extra_df)
         if len(ed)>0:
             ed["ATD_dt"] = ed["ATD"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
             ed["is_F"] = ed["FLT"].astype(str).str.strip().str.upper().str.endswith("F")
-            ed["start"] = ed.apply(lambda r: r["ATD_dt"] - timedelta(minutes=(20 if r["is_F"] else int(dep_before))), axis=1)
-            ed["end"]   = ed.apply(lambda r: r["ATD_dt"] + timedelta(minutes=(10  if r["is_F"] else int(dep_after))),  axis=1)
+            ed["start"] = ed.apply(lambda r: r["ATD_dt"] - timedelta(minutes=(F_BEFORE if r["is_F"] else int(dep_before))), axis=1)
+            ed["end"]   = ed.apply(lambda r: r["ATD_dt"] + timedelta(minutes=(F_AFTER  if r["is_F"] else int(dep_after))),  axis=1)
 
             ed["marker"] = ed["ATD_dt"]
             ed["type"] = "DEP_EXTRA"
@@ -303,8 +308,8 @@ if extra_df is not None and isinstance(extra_df, pd.DataFrame) and len(extra_df)
         if len(ea)>0:
             ea["ATA_dt"] = ea["ATA"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
             ea["is_F"] = ea["FLT"].astype(str).str.strip().str.upper().str.endswith("F")
-            ea["start"] = ea.apply(lambda r: r["ATA_dt"] - timedelta(minutes=(20 if r["is_F"] else int(arr_before))), axis=1)
-            ea["end"]   = ea.apply(lambda r: r["ATA_dt"] + timedelta(minutes=(10  if r["is_F"] else int(arr_after))),  axis=1)
+            ea["start"] = ea.apply(lambda r: r["ATA_dt"] - timedelta(minutes=(F_BEFORE if r["is_F"] else int(arr_before))), axis=1)
+            ea["end"]   = ea.apply(lambda r: r["ATA_dt"] + timedelta(minutes=(F_AFTER  if r["is_F"] else int(arr_after))),  axis=1)
             ea["marker"] = ea["ATA_dt"]
             ea["type"] = "ARR_EXTRA"
             ea["time_str"] = ea["ATA"].apply(hhmm_text)
