@@ -360,7 +360,7 @@ for i, row in dep_block.iterrows():
 
     ax1.plot([row["start"], row["end"]], [i, i], color=color, linewidth=4, label=label_once)
     if row["Label"]:
-        ax1.text(row["end"] + timedelta(minutes=5), i, row["Label"], va="center", fontsize=8, color=color)
+        ax1.text(row["end"] + timedelta(minutes=5), i, row["Label"], va="center", fontsize=7, color=color)
     ax1.plot(row["marker"], i, marker=("D" if is_extra else "o"), color=color)
     # time label at top-left of marker
     ax1.text(row["marker"] - timedelta(minutes=3), i+0.15, row["time_str"],
@@ -387,7 +387,7 @@ for i, row in arr_block.iterrows():
 
     ax1.plot([row["start"], row["end"]], [y, y], color=color, linewidth=4, label=label_once)
     if row["Label"]:
-        ax1.text(row["end"] + timedelta(minutes=5), y, row["Label"], va="center", fontsize=8, color=color)
+        ax1.text(row["end"] + timedelta(minutes=5), y, row["Label"], va="center", fontsize=7, color=color)
     ax1.plot(row["marker"], y, marker=("D" if is_extra else "o"), color=color)
     # time label at top-left of marker
     ax1.text(row["marker"] - timedelta(minutes=3), y+0.15, row["time_str"],
