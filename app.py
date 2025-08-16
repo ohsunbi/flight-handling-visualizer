@@ -227,11 +227,6 @@ elif dep_file is not None and arr_file is not None:
         st.session_state["base_date_autoset_done"] = True
         st.rerun()
 
-    
-    if d_dep is not None and d_arr is not None and d_dep == d_arr:
-        base_date = d_dep
-        st.session_state["base_date"] = d_dep
-
     dep_df = load_dep(dep_file); arr_df = load_arr(arr_file); extra_df = load_extra(extra_file)
 
 else:
