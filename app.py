@@ -14,7 +14,7 @@ st.set_page_config(page_title="Flight Handling Schedule", layout="wide")
 st.sidebar.header("Settings")
 service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min_value=0, max_value=23, value=2, step=1)
 base_date = st.sidebar.date_input("BASE_DATE", value=date.today())
-interval_min = st.sidebar.selectbox("Overlap interval (min)", options=[10, 20, 30], index=0)
+interval_min = st.sidebar.selectbox("Overlap interval (min)", options=[10, 20, 30], index=2)
 
 # Extra 데이터 ON/OFF 토글 추가
 use_extra = st.sidebar.checkbox("Include Extra data", value=True)
@@ -396,7 +396,12 @@ for i, row in arr_block.iterrows():
 # Totals and legend
 total_dep = len(dep_block)
 total_arr = len(arr_block)
-ax1.text(0.01, 1.02, f"Date: {base_date.strftime('%Y-%m-%d')}", transform=ax1.transAxes, fontsize=11, ha="left", va="bottom")
+ax1.text(
+    0.01, 1.02, 
+    base_date.strftime("%Y-%m-%d (%a)"), 
+    transform=ax1.transAxes, fontsize=11, ha="left", va="bottom"
+)
+
 ax1.text(0.99, 1.02, f"Total Departure: {total_dep}   Total Arrival: {total_arr}", transform=ax1.transAxes,
          fontsize=11, ha="right", va="bottom", color="black")
 
