@@ -397,10 +397,11 @@ for i, row in arr_block.iterrows():
 total_dep = len(dep_block)
 total_arr = len(arr_block)
 ax1.text(
-    0.01, 1.02, 
-    base_date.strftime("%Y-%m-%d (%a)"), 
+    0.01, 1.02,
+    f"{base_date.strftime('%Y-%m-%d')} ({base_date.strftime('%a').upper()})",
     transform=ax1.transAxes, fontsize=11, ha="left", va="bottom"
 )
+
 
 ax1.text(0.99, 1.02, f"Total Departure: {total_dep}   Total Arrival: {total_arr}", transform=ax1.transAxes,
          fontsize=11, ha="right", va="bottom", color="black")
