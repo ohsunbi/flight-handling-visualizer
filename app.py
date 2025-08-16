@@ -1,8 +1,6 @@
 
 import io
 import math
-import re
-from datetime import date
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -12,15 +10,10 @@ from datetime import datetime, date, time, timedelta
 
 st.set_page_config(page_title="Flight Handling Schedule", layout="wide")
 
-# ---- Apply pending base_date override BEFORE widgets render ----
-if "base_date_override" in st.session_state:
-    st.session_state["base_date"] = st.session_state.pop("base_date_override")
-
-
 # ---- Sidebar controls ----
 st.sidebar.header("Settings")
 service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min_value=0, max_value=23, value=2, step=1)
-base_date = st.sidebar.date_input("BASE_DATE", value=date.today(), key="base_date")
+base_date = st.sidebar.date_input("BASE_DATE", value=date.today())
 interval_min = st.sidebar.selectbox("Overlap interval (min)", options=[10, 20, 30], index=2)
 
 # Extra 데이터 ON/OFF 토글 추가
@@ -69,21 +62,6 @@ if reset_data:
         st.rerun()
     else:
         st.experimental_rerun()
-
-def infer_base_date_from_filename(name: str):
-    """
-    허용 형식: arr_YYYYMMDD, dep_YYYYMMDD (확장자 앞까지 검사)
-    예: arr_20241201.xlsx, dep_20241201.csv
-    """
-    stem = name.rsplit(".", 1)[0].lower()
-    m = re.search(r'_(\d{8})$', stem)
-    if not m:
-        return None
-    y, mth, d = m.group(1)[:4], m.group(1)[4:6], m.group(1)[6:]
-    try:
-        return date(int(y), int(mth), int(d))
-    except ValueError:
-        return None
 
 def find_col(df, target):
     target = target.strip().upper()
@@ -214,21 +192,7 @@ if use_sample:
     arr_df = base_raw[["FLT_ARR","ATA"]].rename(columns={"FLT_ARR":"FLT"}); arr_df["REG"] = "HL-" + (arr_df.index+200).astype(str)
     extra_df = pd.read_csv("sample_extra_v64.csv")
 elif dep_file is not None and arr_file is not None:
-    # ▼▼▼ 추가: 파일명에서 날짜 추출해서 BASE_DATE 반영 ▼▼▼
-    d_dep = infer_base_date_from_filename(dep_file.name)
-    d_arr = infer_base_date_from_filename(arr_file.name)
-
-    if "base_date_autoset_done" not in st.session_state:
-        st.session_state["base_date_autoset_done"] = False
-
-    if (d_dep is not None and d_arr is not None and d_dep == d_arr
-        and not st.session_state["base_date_autoset_done"]):
-        st.session_state["base_date_override"] = d_dep
-        st.session_state["base_date_autoset_done"] = True
-        st.rerun()
-
     dep_df = load_dep(dep_file); arr_df = load_arr(arr_file); extra_df = load_extra(extra_file)
-
 else:
     st.info("Upload departures & arrivals (and optional extra data), or click 'Load sample data'.")
     st.stop()
