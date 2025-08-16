@@ -2,6 +2,7 @@
 import io
 import math
 import re
+from datetime import date
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -10,6 +11,11 @@ from matplotlib import transforms
 from datetime import datetime, date, time, timedelta
 
 st.set_page_config(page_title="Flight Handling Schedule", layout="wide")
+
+# ---- Apply pending base_date override BEFORE widgets render ----
+if "base_date_override" in st.session_state:
+    st.session_state["base_date"] = st.session_state.pop("base_date_override")
+
 
 # ---- Sidebar controls ----
 st.sidebar.header("Settings")
@@ -211,6 +217,18 @@ elif dep_file is not None and arr_file is not None:
     # ▼▼▼ 추가: 파일명에서 날짜 추출해서 BASE_DATE 반영 ▼▼▼
     d_dep = infer_base_date_from_filename(dep_file.name)
     d_arr = infer_base_date_from_filename(arr_file.name)
+
+    if "base_date_autoset_done" not in st.session_state:
+    st.session_state["base_date_autoset_done"] = False
+
+    if (d_dep is not None and d_arr is not None and d_dep == d_arr
+    and not st.session_state["base_date_autoset_done"]):
+    # ↓↓↓ 직접 base_date를 즉시 바꾸지 말고, override에 담고 rerun
+    st.session_state["base_date_override"] = d_dep
+    st.session_state["base_date_autoset_done"] = True
+    st.rerun()
+
+    
     if d_dep is not None and d_arr is not None and d_dep == d_arr:
         base_date = d_dep
         st.session_state["base_date"] = d_dep
