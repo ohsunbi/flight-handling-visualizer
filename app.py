@@ -231,8 +231,15 @@ dep_df["time_dt"] = dep_df["TIME_RAW"].apply(lambda x: hhmm_to_datetime(base_dat
 dep_df["time_dt"] = pd.to_datetime(dep_df["time_dt"], errors="coerce")
 dep_df = dep_df.dropna(subset=["time_dt"]).reset_index(drop=True)
 
-dep_df["start"]   = dep_df["time_dt"] - timedelta(minutes=int(dep_before))
-dep_df["end"]     = dep_df["time_dt"] + timedelta(minutes=int(dep_after))
+# F-flag
+dep_df["is_F"] = dep_df["FLT"].astype(str).str.strip().str.upper().str.endswith("F")
+dep_df["start"] = dep_df.apply(
+    lambda r: r["time_dt"] - timedelta(minutes=(20 if r["is_F"] else int(dep_before))), axis=1
+)
+dep_df["end"] = dep_df.apply(
+    lambda r: r["time_dt"] + timedelta(minutes=(10 if r["is_F"] else int(dep_after))), axis=1
+)
+
 dep_df["marker"]  = dep_df["time_dt"]
 dep_df["type"]    = "DEP"
 dep_df["time_str"] = dep_df["time_dt"].dt.strftime("%H:%M")
@@ -255,8 +262,18 @@ arr_df["time_dt"] = arr_df["TIME_RAW"].apply(lambda x: hhmm_to_datetime(base_dat
 arr_df["time_dt"] = pd.to_datetime(arr_df["time_dt"], errors="coerce")
 arr_df = arr_df.dropna(subset=["time_dt"]).reset_index(drop=True)
 
-arr_df["start"]   = arr_df["time_dt"] - timedelta(minutes=int(arr_before))
-arr_df["end"]     = arr_df["time_dt"] + timedelta(minutes=int(arr_after))
+# F-flag
+arr_df["is_F"] = arr_df["FLT"].astype(str).str.strip().str.upper().str.endswith("F")
+
+
+# 변경: F면 -20 ~ +10, 아니면 기존 사이드바 값
+arr_df["start"] = arr_df.apply(
+    lambda r: r["time_dt"] - timedelta(minutes=(20 if r["is_F"] else int(arr_before))), axis=1
+)
+arr_df["end"] = arr_df.apply(
+    lambda r: r["time_dt"] + timedelta(minutes=(10 if r["is_F"] else int(arr_after))), axis=1
+)
+
 arr_df["marker"]  = arr_df["time_dt"]
 arr_df["type"]    = "ARR"
 arr_df["time_str"] = arr_df["time_dt"].dt.strftime("%H:%M")
@@ -272,8 +289,10 @@ if extra_df is not None and isinstance(extra_df, pd.DataFrame) and len(extra_df)
         ed = ex[ex["ATD"].notna()].copy()
         if len(ed)>0:
             ed["ATD_dt"] = ed["ATD"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
-            ed["start"] = ed["ATD_dt"] - timedelta(minutes=int(dep_before))
-            ed["end"]   = ed["ATD_dt"] + timedelta(minutes=int(dep_after))
+            ed["is_F"] = ed["FLT"].astype(str).str.strip().str.upper().str.endswith("F")
+            ed["start"] = ed.apply(lambda r: r["ATD_dt"] - timedelta(minutes=(20 if r["is_F"] else int(dep_before))), axis=1)
+            ed["end"]   = ed.apply(lambda r: r["ATD_dt"] + timedelta(minutes=(10  if r["is_F"] else int(dep_after))),  axis=1)
+
             ed["marker"] = ed["ATD_dt"]
             ed["type"] = "DEP_EXTRA"
             ed["time_str"] = ed["ATD"].apply(hhmm_text)
@@ -283,8 +302,9 @@ if extra_df is not None and isinstance(extra_df, pd.DataFrame) and len(extra_df)
         ea = ex[ex["ATA"].notna()].copy()
         if len(ea)>0:
             ea["ATA_dt"] = ea["ATA"].apply(lambda x: hhmm_to_datetime(base_date, x, service_start_hour))
-            ea["start"] = ea["ATA_dt"] - timedelta(minutes=int(arr_before))
-            ea["end"]   = ea["ATA_dt"] + timedelta(minutes=int(arr_after))
+            ea["is_F"] = ea["FLT"].astype(str).str.strip().str.upper().str.endswith("F")
+            ea["start"] = ea.apply(lambda r: r["ATA_dt"] - timedelta(minutes=(20 if r["is_F"] else int(arr_before))), axis=1)
+            ea["end"]   = ea.apply(lambda r: r["ATA_dt"] + timedelta(minutes=(10  if r["is_F"] else int(arr_after))),  axis=1)
             ea["marker"] = ea["ATA_dt"]
             ea["type"] = "ARR_EXTRA"
             ea["time_str"] = ea["ATA"].apply(hhmm_text)
