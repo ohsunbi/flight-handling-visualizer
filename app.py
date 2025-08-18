@@ -223,11 +223,14 @@ def label_for(flt, reg):
 dep_df = dep_df.copy()
 
 def pick_time_dep(r):
-    for k in ("ATD", "ETD", "STD"):
+    # for k in ("ATD", "ETD", "STD"):
+    for k in ("STD", "ATD", "ETD"):
         v = r.get(k, pd.NA)
         if pd.notna(v) and str(v).strip() != "":
             return v
     return pd.NA
+
+
 
 dep_df["TIME_RAW"] = dep_df.apply(pick_time_dep, axis=1)
 dep_df = dep_df[pd.notna(dep_df["TIME_RAW"])].reset_index(drop=True)  # drop rows with no time
@@ -254,7 +257,8 @@ dep_df["Label"]   = dep_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1
 arr_df = arr_df.copy()
 
 def pick_time_arr(r):
-    for k in ("ATA", "ETA", "STA"):
+    # for k in ("ATA", "ETA", "STA"):
+    for k in ("STA", "ATA", "ETA"):        
         v = r.get(k, pd.NA)
         if pd.notna(v) and str(v).strip() != "":
             return v
