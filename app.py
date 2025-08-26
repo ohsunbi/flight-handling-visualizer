@@ -223,6 +223,9 @@ def label_for(flt, reg):
 dep_df = dep_df.copy()
 
 def pick_time_dep(r):
+
+    # 반영 우선 순위, 현재는 ATD 기반
+    
     for k in ("ATD", "ETD", "STD"):
     # for k in ("STD", "ATD", "ETD"):
         
@@ -258,6 +261,9 @@ dep_df["Label"]   = dep_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1
 arr_df = arr_df.copy()
 
 def pick_time_arr(r):
+
+    # 반영 우선 순위, 현재는 ATA 기반
+    
     for k in ("ATA", "ETA", "STA"):     
     # for k in ("STA", "ATA", "ETA"):      
         v = r.get(k, pd.NA)
