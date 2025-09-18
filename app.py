@@ -44,7 +44,7 @@ with date_col1:
     st.button("◀", help="전날", key="btn_prev_day", on_click=_prev_day)
 with date_col2:
     # value를 세션으로 초기화해 주되 key로 상태는 위젯이 관리
-    st.sidebar.date_input(
+    st.date_input(
         label="",
         value=st.session_state.base_date,
         key="base_date",
