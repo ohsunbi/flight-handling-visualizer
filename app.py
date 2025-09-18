@@ -6,7 +6,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib import transforms
-from datetime import datetime, date, time, timedelta
+from datetime import timedelta, datetime, date as _date
 
 st.set_page_config(page_title="Flight Handling Schedule", layout="wide")
 
@@ -18,16 +18,32 @@ F_AFTER  = 10   # F 편일 때 기본 after 시간
 st.sidebar.header("Settings")
 service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min_value=0, max_value=23, value=2, step=1)
 
-# BASE_DATE + 전/다음날 버튼
-from datetime import timedelta
+# --- Sidebar: BASE_DATE + Prev/Next (callback safe) ---
+
+# 초기값 보장
 if "base_date" not in st.session_state:
-    st.session_state.base_date = date.today()
+    st.session_state.base_date = _date.today()
+
+def _normalize_base_date():
+    bd = st.session_state.get("base_date")
+    # 위젯에서 datetime으로 들어오는 경우 대비
+    if isinstance(bd, datetime):
+        st.session_state.base_date = bd.date()
+
+def _prev_day():
+    _normalize_base_date()
+    st.session_state.base_date = st.session_state.base_date - timedelta(days=1)
+
+def _next_day():
+    _normalize_base_date()
+    st.session_state.base_date = st.session_state.base_date + timedelta(days=1)
 
 st.sidebar.write("BASE_DATE")
 date_col1, date_col2, date_col3 = st.sidebar.columns([1, 2, 1])
 with date_col1:
-    prev_day = st.button("◀", help="전날")
+    st.button("◀", help="전날", key="btn_prev_day", on_click=_prev_day)
 with date_col2:
+    # value를 세션으로 초기화해 주되 key로 상태는 위젯이 관리
     st.sidebar.date_input(
         label="",
         value=st.session_state.base_date,
@@ -35,17 +51,12 @@ with date_col2:
         label_visibility="collapsed",
     )
 with date_col3:
-    next_day = st.button("▶", help="다음날")
+    st.button("▶", help="다음날", key="btn_next_day", on_click=_next_day)
 
-if prev_day:
-    st.session_state.base_date = st.session_state.base_date - timedelta(days=1)
-    st.rerun()
-if next_day:
-    st.session_state.base_date = st.session_state.base_date + timedelta(days=1)
-    st.rerun()
-
-# 이 아래에서 base_date를 세션 값으로 사용
+# 이후 코드에서 사용할 base_date 확보(형 변환 안전장치)
 base_date = st.session_state.base_date
+if isinstance(base_date, datetime):
+    base_date = base_date.date()
 
 interval_min = st.sidebar.selectbox("Overlap interval (min)", options=[10, 20, 30], index=2)
 
