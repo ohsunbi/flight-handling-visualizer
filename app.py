@@ -319,16 +319,25 @@ else:
                 f"{getattr(selected_dep_file,'name','?')} / {getattr(selected_arr_file,'name','?')}"
             )
         else:
-            # 패턴은 맞는데 해당 날짜가 없을 때: 안내 후 중단(원하시면 '가장 가까운 날짜' 자동 선택으로 확장 가능)
-            missing = []
-            if selected_dep_file is None: missing.append("Departure")
-            if selected_arr_file is None: missing.append("Arrival")
-            st.warning(
-                f"파일명 패턴은 인식했지만 {base_date.strftime('%Y-%m-%d')}에 해당하는 "
-                + ", ".join(missing) + " 파일을 찾지 못했습니다. "
-                "파일명을 dep_YYMMDD / arr_YYMMDD 형식으로 확인해 주세요."
-            )
-            st.stop()
+            # 패턴은 인식됐지만 해당 날짜가 없으면 → 폴백: 업로드한 파일 그대로 사용
+            if dep_files and arr_files:
+                fallback_dep = dep_files[0]
+                fallback_arr = arr_files[0]
+                dep_df = load_dep(fallback_dep)
+                arr_df = load_arr(fallback_arr)
+                extra_df = load_extra(extra_file)
+                st.info(
+                    "파일명에서 날짜를 찾지 못해 BASE_DATE를 무시하고, "
+                    "업로드한 파일 그대로 시각화합니다. "
+                    f"(사용 중: {getattr(fallback_dep,'name','?')} / {getattr(fallback_arr,'name','?')})"
+                )
+            else:
+                st.warning(
+                    f"{base_date.strftime('%Y-%m-%d')}에 해당하는 파일을 찾지 못했고, "
+                    "폴백에 사용할 업로드 파일도 없습니다. Departure/Arrival 파일을 업로드해 주세요."
+                )
+                st.stop()
+
     else:
         # === Fallback: 파일명이 패턴이 아니면 '기존 방식' ===
         if dep_files and arr_files:
