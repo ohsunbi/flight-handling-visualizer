@@ -17,11 +17,8 @@ F_AFTER  = 10   # F 편일 때 기본 after 시간
 # ---- Sidebar controls ----
 st.sidebar.header("Settings")
 service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min_value=0, max_value=23, value=2, step=1)
-# ---- Sidebar controls ----
-st.sidebar.header("Settings")
-service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min_value=0, max_value=23, value=2, step=1)
 
-# 👉 BASE_DATE + 전/다음날 버튼
+# BASE_DATE + 전/다음날 버튼
 from datetime import timedelta
 if "base_date" not in st.session_state:
     st.session_state.base_date = date.today()
