@@ -39,7 +39,7 @@ def _next_day():
     st.session_state.base_date = st.session_state.base_date + timedelta(days=1)
 
 st.sidebar.write("BASE_DATE")
-date_col1, date_col2, date_col3 = st.sidebar.columns([1, 2, 1])
+date_col1, date_col2, date_col3 = st.sidebar.columns([1, 4, 1])
 with date_col1:
     st.button("◀", help="전날", key="btn_prev_day", on_click=_prev_day)
 with date_col2:
