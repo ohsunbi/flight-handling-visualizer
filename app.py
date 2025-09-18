@@ -17,7 +17,39 @@ F_AFTER  = 10   # F 편일 때 기본 after 시간
 # ---- Sidebar controls ----
 st.sidebar.header("Settings")
 service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min_value=0, max_value=23, value=2, step=1)
-base_date = st.sidebar.date_input("BASE_DATE", value=date.today())
+# ---- Sidebar controls ----
+st.sidebar.header("Settings")
+service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min_value=0, max_value=23, value=2, step=1)
+
+# 👉 BASE_DATE + 전/다음날 버튼
+from datetime import timedelta
+if "base_date" not in st.session_state:
+    st.session_state.base_date = date.today()
+
+st.sidebar.write("BASE_DATE")
+date_col1, date_col2, date_col3 = st.sidebar.columns([1, 2, 1])
+with date_col1:
+    prev_day = st.button("◀", help="전날")
+with date_col2:
+    st.sidebar.date_input(
+        label="",
+        value=st.session_state.base_date,
+        key="base_date",
+        label_visibility="collapsed",
+    )
+with date_col3:
+    next_day = st.button("▶", help="다음날")
+
+if prev_day:
+    st.session_state.base_date = st.session_state.base_date - timedelta(days=1)
+    st.rerun()
+if next_day:
+    st.session_state.base_date = st.session_state.base_date + timedelta(days=1)
+    st.rerun()
+
+# 이 아래에서 base_date를 세션 값으로 사용
+base_date = st.session_state.base_date
+
 interval_min = st.sidebar.selectbox("Overlap interval (min)", options=[10, 20, 30], index=2)
 
 # Extra 데이터 ON/OFF 토글 추가
@@ -34,6 +66,7 @@ show_flt = st.sidebar.checkbox("Show FLT", value=False)
 show_reg = st.sidebar.checkbox("Show REG", value=False)
 
 st.title(f"Flight Handling Schedule ({base_date.strftime('%Y-%m-%d')})")
+top_chart = st.container()
 
 st.sidebar.markdown("---")
 st.sidebar.write("Upload files with headers:")
@@ -569,13 +602,12 @@ buf = io.BytesIO()
 fig1.savefig(buf, format="png", dpi=200, bbox_inches="tight")
 buf.seek(0)
 
-# Download button
-st.download_button(
-    label="Download chart as PNG",
-    data=buf,
-    file_name=filename,
-    mime="image/png"
-)
+with top_chart:
+    st.download_button(
+        label="Download chart as PNG",
+        data=buf,
+        file_name=filename,
+        mime="image/png"
+    )
+    st.pyplot(fig1, use_container_width=True)
 
-# Render
-st.pyplot(fig1, use_container_width=True)
