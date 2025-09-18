@@ -1,6 +1,6 @@
-
 import io
 import math
+import re
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -9,7 +9,6 @@ from matplotlib import transforms
 from datetime import datetime, date, time, timedelta
 
 st.set_page_config(page_title="Flight Handling Schedule", layout="wide")
-
 
 # ===== Global Settings =====
 F_BEFORE = 20   # F 편일 때 기본 before 시간
@@ -41,14 +40,30 @@ st.sidebar.write("Upload files with headers:")
 st.sidebar.write("- Departures: **FLT, ATD, (optional: ETD, STD), REG**")
 st.sidebar.write("- Arrivals: **FLT, ATA, (optional: ETA, STA), REG**")
 st.sidebar.write("- Extra data (mixed dep/arr): **FLT, DES, ATA, ATD**  (HHMM)")
+st.sidebar.write("- 파일명 패턴(선택): **dep_YYMMDD**, **arr_YYMMDD**")
 
+# --- Multi-file uploaders (by date) ---
 col1, col2, col3 = st.columns(3)
 with col1:
-    dep_file = st.file_uploader("Departures file", type=["xlsx","xls","csv"], key="dep")
+    dep_files = st.file_uploader(
+        "Departures files (multiple)",
+        type=["xlsx","xls","csv"],
+        key="dep_multi",
+        accept_multiple_files=True
+    )
 with col2:
-    arr_file = st.file_uploader("Arrivals file", type=["xlsx","xls","csv"], key="arr")
+    arr_files = st.file_uploader(
+        "Arrivals files (multiple)",
+        type=["xlsx","xls","csv"],
+        key="arr_multi",
+        accept_multiple_files=True
+    )
 with col3:
-    extra_file = st.file_uploader("Extra data file (FLT, DES, ATA, ATD)", type=["xlsx","xls","csv"], key="extra")
+    extra_file = st.file_uploader(
+        "Extra data file (FLT, DES, ATA, ATD)",
+        type=["xlsx","xls","csv"],
+        key="extra"
+    )
 
 col_btn1, col_btn2 = st.columns([1, 1])
 with col_btn1:
@@ -59,7 +74,7 @@ with col_btn2:
 # Reset logic
 if reset_data:
     # clear file uploaders & any temp flags
-    for k in ("dep", "arr", "extra"):
+    for k in ("dep_multi", "arr_multi", "extra"):
         st.session_state.pop(k, None)
     for k in ("dep_df", "arr_df", "extra_df", "use_sample"):
         st.session_state.pop(k, None)
@@ -67,6 +82,42 @@ if reset_data:
         st.rerun()
     else:
         st.experimental_rerun()
+
+# ===== Helpers =====
+_PAT = re.compile(r'^(arr|dep)[\s_\-]?(\d{6})', re.I)
+
+def _is_pattern_name(name: str, expect_prefix: str = None) -> bool:
+    """파일명이 arr_YYMMDD / dep_YYMMDD 패턴인지 판별"""
+    if not name:
+        return False
+    m = _PAT.search(name.strip().lower())
+    if not m:
+        return False
+    return (expect_prefix is None) or (m.group(1).lower() == expect_prefix)
+
+def _extract_date_from_name(name: str):
+    """arr_YYMMDD / dep_YYMMDD 에서 날짜 추출 -> datetime.date"""
+    m = _PAT.search(str(name).strip().lower())
+    if not m:
+        return None
+    yymmdd = m.group(2)
+    yy, mm, dd = int(yymmdd[:2]), int(yymmdd[2:4]), int(yymmdd[4:6])
+    year = 2000 + yy  # 20xx 가정
+    try:
+        return date(year, mm, dd)
+    except ValueError:
+        return None
+
+def _pick_file_for_date(files, target_date: date, prefix: str):
+    """BASE_DATE와 동일한 YYMMDD를 가진 파일 선택"""
+    if not files:
+        return None
+    for f in files:
+        if _is_pattern_name(getattr(f, "name", ""), prefix):
+            d = _extract_date_from_name(getattr(f, "name", ""))
+            if d == target_date:
+                return f
+    return None
 
 def find_col(df, target):
     target = target.strip().upper()
@@ -184,26 +235,9 @@ def hhmm_to_datetime(base_date, hhmm, service_hour):
             return None
 
     dt = datetime.combine(base_date, tt)
-    if time(tt.hour, tt.minute) < time(service_hour, 0):
+    if time(tt.hour, tt.minute) < time(service_start_hour, 0):
         dt += timedelta(days=1)
     return dt
-
-
-
-# Load data
-if use_sample:
-    base_raw = pd.read_csv("flights_sample.csv")
-    dep_df = base_raw[["FLT_DEP","ATD"]].rename(columns={"FLT_DEP":"FLT"}); dep_df["REG"] = "HL-" + (dep_df.index+100).astype(str)
-    arr_df = base_raw[["FLT_ARR","ATA"]].rename(columns={"FLT_ARR":"FLT"}); arr_df["REG"] = "HL-" + (arr_df.index+200).astype(str)
-    extra_df = pd.read_csv("sample_extra_v64.csv")
-elif dep_file is not None and arr_file is not None:
-    dep_df = load_dep(dep_file); arr_df = load_arr(arr_file); extra_df = load_extra(extra_file)
-else:
-    st.info("Upload departures & arrivals (and optional extra data), or click 'Load sample data'.")
-    st.stop()
-
-if not use_extra:
-    extra_df = None
 
 def hhmm_text(v):
     s = str(v).zfill(4)
@@ -215,6 +249,66 @@ def label_for(flt, reg):
     if show_reg and pd.notna(reg) and str(reg).strip(): parts.append(str(reg))
     return " / ".join(parts)
 
+# ============================
+# Resolve & Load data sources
+# ============================
+# 패턴 파일 존재 여부 판단
+dep_matches = [f for f in (dep_files or []) if _is_pattern_name(getattr(f, "name", ""), "dep")]
+arr_matches = [f for f in (arr_files or []) if _is_pattern_name(getattr(f, "name", ""), "arr")]
+use_date_mode = (len(dep_matches) > 0 and len(arr_matches) > 0)
+
+if use_sample:
+    base_raw = pd.read_csv("flights_sample.csv")
+    dep_df = base_raw[["FLT_DEP","ATD"]].rename(columns={"FLT_DEP":"FLT"}); dep_df["REG"] = "HL-" + (dep_df.index+100).astype(str)
+    arr_df = base_raw[["FLT_ARR","ATA"]].rename(columns={"FLT_ARR":"FLT"}); arr_df["REG"] = "HL-" + (arr_df.index+200).astype(str)
+    extra_df = pd.read_csv("sample_extra_v64.csv")
+
+else:
+    if use_date_mode:
+        # BASE_DATE에 해당하는 파일 선택
+        selected_dep_file = _pick_file_for_date(dep_matches, base_date, "dep")
+        selected_arr_file = _pick_file_for_date(arr_matches, base_date, "arr")
+
+        if selected_dep_file is not None and selected_arr_file is not None:
+            dep_df = load_dep(selected_dep_file)
+            arr_df = load_arr(selected_arr_file)
+            extra_df = load_extra(extra_file)
+            st.success(
+                f"[DATE MODE] {base_date.strftime('%Y-%m-%d')} → "
+                f"{getattr(selected_dep_file,'name','?')} / {getattr(selected_arr_file,'name','?')}"
+            )
+        else:
+            # 패턴은 맞는데 해당 날짜가 없을 때: 안내 후 중단(원하시면 '가장 가까운 날짜' 자동 선택으로 확장 가능)
+            missing = []
+            if selected_dep_file is None: missing.append("Departure")
+            if selected_arr_file is None: missing.append("Arrival")
+            st.warning(
+                f"파일명 패턴은 인식했지만 {base_date.strftime('%Y-%m-%d')}에 해당하는 "
+                + ", ".join(missing) + " 파일을 찾지 못했습니다. "
+                "파일명을 dep_YYMMDD / arr_YYMMDD 형식으로 확인해 주세요."
+            )
+            st.stop()
+    else:
+        # === Fallback: 파일명이 패턴이 아니면 '기존 방식' ===
+        if dep_files and arr_files:
+            # 여러 개면 첫 파일 사용 (필요 시 selectbox로 확장 가능)
+            selected_dep_file = dep_files[0]
+            selected_arr_file = arr_files[0]
+            dep_df = load_dep(selected_dep_file)
+            arr_df = load_arr(selected_arr_file)
+            extra_df = load_extra(extra_file)
+            st.info(
+                "파일명이 arr_YYMMDD/dep_YYMMDD 형식이 아니므로 BASE_DATE를 **무시**하고 "
+                "업로드한 파일 그대로 시각화합니다. "
+                f"(사용 중: {getattr(selected_dep_file,'name','?')} / {getattr(selected_arr_file,'name','?')})"
+            )
+        else:
+            st.info("Departure/Arrival 파일을 업로드해 주세요. (샘플을 쓰려면 'Load sample data')")
+            st.stop()
+
+if not use_extra:
+    extra_df = None
+
 # ==============================
 # Compute windows with fallbacks
 # ==============================
@@ -223,17 +317,12 @@ def label_for(flt, reg):
 dep_df = dep_df.copy()
 
 def pick_time_dep(r):
-
     # 반영 우선 순위, 현재는 ATD 기반
-    # for k in ("STD", "ATD", "ETD"):    
-    
     for k in ("ATD", "ETD", "STD"):
         v = r.get(k, pd.NA)
         if pd.notna(v) and str(v).strip() != "":
             return v
     return pd.NA
-
-
 
 dep_df["TIME_RAW"] = dep_df.apply(pick_time_dep, axis=1)
 dep_df = dep_df[pd.notna(dep_df["TIME_RAW"])].reset_index(drop=True)  # drop rows with no time
@@ -260,12 +349,8 @@ dep_df["Label"]   = dep_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1
 arr_df = arr_df.copy()
 
 def pick_time_arr(r):
-
-    
     # 반영 우선 순위, 현재는 ATA 기반
-    # for k in ("STA", "ATA", "ETA"): 
-    
-    for k in ("ATA", "ETA", "STA"):     
+    for k in ("ATA", "ETA", "STA"):
         v = r.get(k, pd.NA)
         if pd.notna(v) and str(v).strip() != "":
             return v
@@ -280,7 +365,6 @@ arr_df = arr_df.dropna(subset=["time_dt"]).reset_index(drop=True)
 
 # F-flag
 arr_df["is_F"] = arr_df["FLT"].astype(str).str.strip().str.upper().str.endswith("F")
-
 
 # 변경: F면 -20 ~ +10, 아니면 기존 사이드바 값
 arr_df["start"] = arr_df.apply(
@@ -372,7 +456,6 @@ mid_times = [time_range[i] + (time_range[i+1] - time_range[i]) / 2
 dep_counts = [count_overlaps(dep_intervals, t) for t in mid_times]
 arr_counts = [count_overlaps(arr_intervals, t) for t in mid_times]
 
-
 # ---- Timeline with inline overlap numbers (two rows) ----
 fig1, ax1 = plt.subplots(figsize=(12, 8))
 
@@ -438,7 +521,6 @@ ax1.text(
     transform=ax1.transAxes, fontsize=11, ha="left", va="bottom"
 )
 
-
 ax1.text(0.99, 1.02, f"Total Departure: {total_dep}   Total Arrival: {total_arr}", transform=ax1.transAxes,
          fontsize=11, ha="right", va="bottom", color="black")
 
@@ -473,8 +555,6 @@ for i, mid in enumerate(mid_times):
         ax1.text(mid, -0.14, str(a), transform=trans, ha="center", va="top",
                  fontsize=8, color=(0.12, 0.46, 0.70, alpha))  # Arrival (blue)
 
-
-
 # Align x-limits and grid without gray bands
 ax1.set_xlim(start_time, end_time)
 ax1.grid(True, axis="x", linestyle="--", alpha=0.3)
@@ -483,8 +563,6 @@ ax1.grid(True, axis="x", linestyle="--", alpha=0.3)
 # filename: YYYY-MM-DD_Weekday_D{dep}_A{arr}.png
 extra_tag = "(E)" if use_extra else ""
 filename = f"{base_date.strftime('%Y-%m-%d')}_{base_date.strftime('%a')}_D{total_dep}_A{total_arr}{extra_tag}.png"
-
-
 
 # Create PNG bytes
 buf = io.BytesIO()
