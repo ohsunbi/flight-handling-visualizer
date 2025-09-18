@@ -6,7 +6,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib import transforms
-from datetime import timedelta, datetime, date as _date
+from datetime import datetime, date, time, timedelta
 
 st.set_page_config(page_title="Flight Handling Schedule", layout="wide")
 
@@ -22,7 +22,7 @@ service_start_hour = st.sidebar.number_input("Service day starts at (hour)", min
 
 # 초기값 보장
 if "base_date" not in st.session_state:
-    st.session_state.base_date = _date.today()
+    st.session_state.base_date = date.today()
 
 def _normalize_base_date():
     bd = st.session_state.get("base_date")
