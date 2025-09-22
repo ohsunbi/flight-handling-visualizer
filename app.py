@@ -72,6 +72,7 @@ arr_after  = st.sidebar.number_input("Arrival window end (after ATA)", 0, 240, 3
 st.sidebar.subheader("Labels on bars")
 show_flt = st.sidebar.checkbox("Show FLT", value=False)
 show_reg = st.sidebar.checkbox("Show REG", value=False)
+show_memo = st.sidebar.checkbox("Show MEMO", value=False)
 
 st.title(f"Flight Handling Schedule ({base_date.strftime('%Y-%m-%d')})")
 top_chart = st.container()
@@ -195,9 +196,12 @@ def load_dep(file):
         raise KeyError("Departures must include FLT column.")
     c_flt = cmap["FLT"]
     reg_series = get("REG")
+    memo_series = get("MEMO")
+    
     out = pd.DataFrame({
         "FLT": df[c_flt],
-        "REG": reg_series if reg_series is not None else ""
+        "REG": reg_series if reg_series is not None else "",
+        "MEMO": memo_series if memo_series is not None else ""
     })
     # optional time columns: ATD > ETD > STD
     out["ATD"] = get("ATD")
@@ -216,9 +220,12 @@ def load_arr(file):
         raise KeyError("Arrivals must include FLT column.")
     c_flt = cmap["FLT"]
     reg_series = get("REG")
+    memo_series = get("MEMO")
+    
     out = pd.DataFrame({
         "FLT": df[c_flt],
-        "REG": reg_series if reg_series is not None else ""
+        "REG": reg_series if reg_series is not None else "",
+        "MEMO": memo_series if memo_series is not None else ""
     })
     # optional time columns: ATA > ETA > STA
     out["ATA"] = get("ATA")
@@ -238,10 +245,15 @@ def load_extra(file):
     des_col = cmap["DES"] if "DES" in cmap else None
     ata_col = cmap["ATA"] if "ATA" in cmap else None
     atd_col = cmap["ATD"] if "ATD" in cmap else None
+    reg_col  = cmap["REG"]  if "REG"  in cmap else None
+    memo_col = cmap["MEMO"] if "MEMO" in cmap else None      
+    
     out = pd.DataFrame({"FLT": df[c_flt]})
     if des_col: out["DES"] = df[des_col]
     if ata_col: out["ATA"] = df[ata_col]
     if atd_col: out["ATD"] = df[atd_col]
+    if reg_col:  out["REG"]  = df[reg_col]
+    if memo_col: out["MEMO"] = df[memo_col]
     return out
 
 def hhmm_to_datetime(base_date, hhmm, service_hour):
@@ -284,10 +296,11 @@ def hhmm_text(v):
     s = str(v).zfill(4)
     return s[:2] + ":" + s[2:]
 
-def label_for(flt, reg):
+def label_for(flt, reg, memo=None):
     parts = []
     if show_flt: parts.append(str(flt).replace("ESR","ZE"))
     if show_reg and pd.notna(reg) and str(reg).strip(): parts.append(str(reg))
+    if show_memo and pd.notna(memo) and str(memo).strip(): parts.append(str(memo))
     return " / ".join(parts)
 
 # ============================
@@ -393,7 +406,8 @@ dep_df["end"] = dep_df.apply(
 dep_df["marker"]  = dep_df["time_dt"]
 dep_df["type"]    = "DEP"
 dep_df["time_str"] = dep_df["time_dt"].dt.strftime("%H:%M")
-dep_df["Label"]   = dep_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
+dep_df["Label"] = dep_df.apply(lambda r: label_for(r["FLT"], r.get("REG",""), r.get("MEMO","")), axis=1)
+
 
 # ---- ARRIVALS (ATA > ETA > STA) ----
 arr_df = arr_df.copy()
@@ -427,7 +441,7 @@ arr_df["end"] = arr_df.apply(
 arr_df["marker"]  = arr_df["time_dt"]
 arr_df["type"]    = "ARR"
 arr_df["time_str"] = arr_df["time_dt"].dt.strftime("%H:%M")
-arr_df["Label"]   = arr_df.apply(lambda r: label_for(r["FLT"], r["REG"]), axis=1)
+arr_df["Label"] = arr_df.apply(lambda r: label_for(r["FLT"], r.get("REG",""), r.get("MEMO","")), axis=1)
 
 # Extra split (unchanged logic: extras still use ATA/ATD when present)
 extra_dep = None; extra_arr = None
@@ -447,6 +461,8 @@ if extra_df is not None and isinstance(extra_df, pd.DataFrame) and len(extra_df)
             ed["type"] = "DEP_EXTRA"
             ed["time_str"] = ed["ATD"].apply(hhmm_text)
             ed["Label"] = ed.apply(lambda r: label_for(str(r.get("FLT","")).replace("ESR","ZE"), r.get("REG","")), axis=1) if ("REG" in ed.columns) else ed["FLT"].apply(lambda f: label_for(str(f).replace("ESR","ZE"), ""))
+            ed["Label"] = ed.apply(lambda r: label_for(str(r.get("FLT","")).replace("ESR","ZE"), r.get("REG",""), r.get("MEMO","")), axis=1)
+            
             extra_dep = ed[["Label","start","end","marker","type","time_str"]]
     if "ATA" in ex.columns:
         ea = ex[ex["ATA"].notna()].copy()
@@ -459,6 +475,7 @@ if extra_df is not None and isinstance(extra_df, pd.DataFrame) and len(extra_df)
             ea["type"] = "ARR_EXTRA"
             ea["time_str"] = ea["ATA"].apply(hhmm_text)
             ea["Label"] = ea.apply(lambda r: label_for(str(r.get("FLT","")).replace("ESR","ZE"), r.get("REG","")), axis=1) if ("REG" in ea.columns) else ea["FLT"].apply(lambda f: label_for(str(f).replace("ESR","ZE"), ""))
+            ea["Label"] = ea.apply(lambda r: label_for(str(r.get("FLT","")).replace("ESR","ZE"), r.get("REG",""), r.get("MEMO","")), axis=1)
             extra_arr = ea[["Label","start","end","marker","type","time_str"]]
 
 # Colors (Reversed scheme: Arrivals blue, Departures red; extras cyan/orange)
