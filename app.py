@@ -643,5 +643,5 @@ with top_chart:
         file_name=filename,
         mime="image/png"
     )
-    st.pyplot(fig1, use_container_width=True)
+    st.pyplot(fig1, use_container_width=False)
 
