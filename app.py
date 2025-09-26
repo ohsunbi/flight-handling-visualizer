@@ -525,6 +525,7 @@ arr_counts = [count_overlaps(arr_intervals, t) for t in mid_times]
 
 # ---- Timeline with inline overlap numbers (two rows) ----
 fig1, ax1 = plt.subplots(figsize=(12, 8))
+fig1, ax1 = plt.subplots(figsize=(20, 6 + max(len(dep_df), len(arr_df)) * 0.5))
 
 # departures block
 dep_block = pd.concat([
